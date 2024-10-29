@@ -72,7 +72,7 @@ if __name__ == "__main__":
     parser.add_argument("--fps", type=float, default=30.0)
     args = parser.parse_args()
 
-    robot: ManipulatorRobot = make_robot(init_hydra_config("lerobot/configs/robot/moss.yaml"))
+    robot: ManipulatorRobot = make_robot(init_hydra_config("lerobot/configs/robot/so100.yaml"))
     robot.connect()
 
     tdmpc = None  # Set this up if you want to see the predicted value function
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         action = action_dict["action"].numpy()
         relative_action = (action_dict["action"] - obs_dict["observation.state"]).numpy()
         maximum_relative_action = np.maximum(np.abs(relative_action), maximum_relative_action)
-        print(maximum_relative_action)
+        print(f"maximum_relative_action: {maximum_relative_action}")
         img = obs_dict["observation.images.main"].numpy()
         annotated_img = img.copy()
         reward, _, _, info = calc_reward_cube_push(

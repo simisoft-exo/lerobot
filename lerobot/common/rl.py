@@ -18,13 +18,14 @@ from lerobot.common.vision import segment_hsv
 # These are for the boundaries of the workspace. If the robot goes out of bounds, the episode is terminated
 # and there is a negative reward. You might need to tweak these for your setup. Use `teleop_with_goals.py` to
 # check rewards.
-GRIPPER_TIP_Z_BOUNDS = (0.008, 0.065)
-GRIPPER_TIP_X_BOUNDS = (0.10, 0.30)
-GRIPPER_TIP_Y_BOUNDS = (-0.2, 0.2)
+GRIPPER_TIP_Z_BOUNDS = (0.00, 0.033)
+GRIPPER_TIP_X_BOUNDS = (0.2, 0.31)
+GRIPPER_TIP_Y_BOUNDS = (-0.1, 0.17)
 GRIPPER_TIP_BOUNDS = np.row_stack([GRIPPER_TIP_X_BOUNDS, GRIPPER_TIP_Y_BOUNDS, GRIPPER_TIP_Z_BOUNDS])
 
 
 def is_in_bounds(gripper_tip_pos, buffer: float | np.ndarray = 0):
+    #print(f"gripper_tip_pos = {gripper_tip_pos}") 
     if not isinstance(buffer, np.ndarray):
         buffer = np.zeros_like(GRIPPER_TIP_BOUNDS) + buffer
     for i, bounds in enumerate(GRIPPER_TIP_BOUNDS):
@@ -63,9 +64,9 @@ def calc_reward_cube_push(
     action: np.ndarray | None = None,
     prior_action: np.ndarray | None = None,
     first_order_smoothness_coeff: float = -0,
-    second_order_smoothness_coeff: float = -0.02,
+    second_order_smoothness_coeff: float = -0.01, # changed to make it less smooth (and maybe learn feaster as it's learning from more sudden movements)
     oob_reward: float = -5.0,
-    occlusion_limit=55,
+    occlusion_limit=40, # allows for smaller cube area, making it work better when lighting is dimmer
     occlusion_reward=-3.0,
 ) -> tuple[float, bool, bool, dict]:
     """Reward function for the push cube task.
@@ -227,20 +228,20 @@ def reset_for_cube_push(robot: ManipulatorRobot, right=True):
     You can run `python lerobot/common/rl` to test the rest. Check the code in `if __name__ == "__main__":`.
     """
     robot.follower_arms["main"].write("Torque_Enable", TorqueMode.ENABLED.value)
-    staging_pos = torch.tensor([0.21972656, 82.74902, 56.601562, 68.115234, 1.5820312, 1.3097577]).float()
+    staging_pos = torch.tensor([0.21972656, 82.74902, 56.601562, 68.115234, 90, 1.3097577]).float()
     while True:
         reset_pos = torch.tensor(
             [
                 # np.random.uniform(125, 135) if right else np.random.uniform(45, 55),
-                np.random.uniform(34, 36) if right else np.random.uniform(-32, -22),
+                np.random.uniform(20, 21) if right else np.random.uniform(-31, -33),
                 # np.random.uniform(54, 58),
-                np.random.uniform(63, 65),
+                np.random.uniform(72, 73) if right else np.random.uniform(66, 67),
                 # np.random.uniform(50, 52),
-                np.random.uniform(73, 77),
+                np.random.uniform(82, 83) if right else np.random.uniform(68, 69),
                 # np.random.uniform(78, 98),
-                np.random.uniform(53, 73),
+                np.random.uniform(60, 61) if right else np.random.uniform(68, 69),
                 # np.random.uniform(-41, -31) if right else np.random.uniform(31, 41),
-                np.random.uniform(-36, -26) if right else np.random.uniform(10, 20),
+                np.random.uniform(63, 64) if right else np.random.uniform(115, 116),
                 # np.random.uniform(0, 20),
                 np.random.uniform(0, 20),
             ]
@@ -250,10 +251,17 @@ def reset_for_cube_push(robot: ManipulatorRobot, right=True):
             buffer=np.array([[0.02, 0.02], [0.02, 0.02], [0.02, 0.01]]),
         ):
             break
+        print(is_in_bounds(
+            RobotKinematics.fk_gripper_tip(reset_pos.numpy())[:3, -1],
+            buffer=np.array([[0.02, 0.02], [0.02, 0.02], [0.02, 0.01]]),
+        ))
+        break
     intermediate_pos = torch.from_numpy(robot.follower_arms["main"].read("Present_Position"))
     intermediate_pos[1] = staging_pos[1]
+    print("ABCD")
     _go_to_pos(robot, intermediate_pos, tol=np.array([5, 7, 5, 10, 5, 5]))
     intermediate_pos[1:] = staging_pos[1:]
+    print("XYZT")
     _go_to_pos(robot, intermediate_pos, tol=np.array([5, 7, 5, 10, 5, 5]))
     if right and staging_pos[0] > intermediate_pos[0]:  # noqa: SIM114
         _go_to_pos(robot, staging_pos, tol=np.array([5, 7, 5, 10, 5, 5]))
@@ -269,7 +277,7 @@ if __name__ == "__main__":
     from lerobot.common.robot_devices.robots.factory import make_robot
     from lerobot.common.utils.utils import init_hydra_config
 
-    robot = make_robot(init_hydra_config("lerobot/configs/robot/moss.yaml"))
+    robot = make_robot(init_hydra_config("lerobot/configs/robot/so100.yaml"))
     robot.connect()
     reset_for_cube_push(robot, right=True)
     reset_for_cube_push(robot, right=False)
