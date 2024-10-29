@@ -45,7 +45,7 @@ if __name__ == "__main__":
     init_logging()
 
     dataset_dir = Path(args.dataset_dir)
-    robot_cfg = init_hydra_config("lerobot/configs/robot/moss.yaml")
+    robot_cfg = init_hydra_config("lerobot/configs/robot/so100.yaml")
     robot: ManipulatorRobot = make_robot(robot_cfg)
     robot.connect()
     if dataset_dir.exists():

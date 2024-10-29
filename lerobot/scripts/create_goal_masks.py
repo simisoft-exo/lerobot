@@ -21,7 +21,7 @@ from lerobot.common.robot_devices.cameras.opencv import OpenCVCamera
 from lerobot.common.utils.utils import init_hydra_config
 from lerobot.common.vision import GoalSetter
 
-cfg = init_hydra_config("lerobot/configs/robot/moss.yaml")
+cfg = init_hydra_config("lerobot/configs/robot/so100.yaml")
 assert len(cfg["cameras"]) == 1
 camera: OpenCVCamera = instantiate(cfg["cameras"][list(cfg["cameras"])[0]])
 camera.connect()

@@ -84,24 +84,24 @@ class RobotKinematics:
     # }
 
     # Measurements for the SO-100 robot.
-    # measurements = {
-    #     "gripper": [0.320, 0, 0.050],
-    #     "wrist": [0.278, 0, 0.050],
-    #     "forearm": [0.143, 0, 0.044],
-    #     "humerus": [0.031, 0, 0.072],
-    #     "shoulder": [0, 0, 0],
-    #     "base": [0, 0, 0.02],  # ?
-    # }
-
-    # Measurements for the Moss V1.0
     measurements = {
-        "gripper": [0.246, 0.013, 0.111],
-        "wrist": [0.245, 0.002, 0.064],
-        "forearm": [0.122, 0, 0.064],
-        "humerus": [0.001, 0.001, 0.063],
+       "gripper": [0.320, 0, 0.050],
+        "wrist": [0.278, 0, 0.050],
+        "forearm": [0.143, 0, 0.044],
+        "humerus": [0.031, 0, 0.072],
         "shoulder": [0, 0, 0],
         "base": [0, 0, 0.02],  # ?
     }
+
+    # Measurements for the Moss V1.0
+   # measurements = {
+   #     "gripper": [0.246, 0.013, 0.111],
+   #     "wrist": [0.245, 0.002, 0.064],
+   #     "forearm": [0.122, 0, 0.064],
+   #     "humerus": [0.001, 0.001, 0.063],
+   #     "shoulder": [0, 0, 0],
+   #     "base": [0, 0, 0.02],  # ?
+   # }
 
     gripper_X0 = np.array(
         [
