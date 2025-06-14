@@ -387,8 +387,25 @@ class SmolVLAPolicy(PreTrainedPolicy):
         """Tokenize the text input"""
         device = batch[OBS_STATE].device
         tasks = batch["task"]
-        if len(tasks) == 1:
-            tasks = [tasks[0] for _ in range(batch[OBS_STATE].shape[0])]
+        
+        # Determine the expected batch size from observations
+        expected_batch_size = batch[OBS_STATE].shape[0]
+        
+        # Handle different task input formats
+        if isinstance(tasks, str):
+            # Single string task - replicate for entire batch
+            tasks = [tasks for _ in range(expected_batch_size)]
+        elif isinstance(tasks, list):
+            if len(tasks) == 1:
+                # Single task in list - replicate for entire batch
+                tasks = [tasks[0] for _ in range(expected_batch_size)]
+            elif len(tasks) != expected_batch_size:
+                # Mismatch - truncate or pad as needed
+                if len(tasks) > expected_batch_size:
+                    tasks = tasks[:expected_batch_size]
+                else:
+                    # Pad by repeating the last task
+                    tasks = tasks + [tasks[-1]] * (expected_batch_size - len(tasks))
 
         tasks = [task if task.endswith("\n") else f"{task}\n" for task in tasks]
         tokenized_prompt = self.language_tokenizer.__call__(
@@ -558,6 +575,17 @@ class VLAFlowMatching(nn.Module):
         embs = []
         pad_masks = []
         att_masks = []
+        
+        # Determine batch size from the first available input
+        if len(images) > 0:
+            batch_size = images[0].shape[0]
+        elif state is not None:
+            batch_size = state.shape[0]
+        elif lang_tokens is not None:
+            batch_size = lang_tokens.shape[0]
+        else:
+            raise ValueError("No valid inputs found to determine batch size")
+        
         for _img_idx, (
             img,
             img_mask,
@@ -568,7 +596,7 @@ class VLAFlowMatching(nn.Module):
                         self.global_image_start_token.to(device=self.vlm_with_expert.vlm.device)
                     )
                     .unsqueeze(0)
-                    .expand(img.shape[0], -1, -1)
+                    .expand(batch_size, -1, -1)  # Use consistent batch_size
                 )
                 image_start_mask = torch.ones_like(
                     image_start_token[:, :, 0], dtype=torch.bool, device=image_start_token.device
@@ -585,6 +613,9 @@ class VLAFlowMatching(nn.Module):
             img_emb = img_emb * torch.tensor(img_emb_dim**0.5, dtype=img_emb.dtype, device=img_emb.device)
 
             bsize, num_img_embs = img_emb.shape[:2]
+            # Ensure img_mask has the correct batch size
+            if img_mask.shape[0] != bsize:
+                img_mask = img_mask[:bsize] if img_mask.shape[0] > bsize else img_mask.expand(bsize)
             img_mask = img_mask[:, None].expand(bsize, num_img_embs)
 
             embs.append(img_emb)
@@ -597,7 +628,7 @@ class VLAFlowMatching(nn.Module):
                         self.image_end_token.to(device=self.vlm_with_expert.vlm.device)
                     )
                     .unsqueeze(0)
-                    .expand(img.shape[0], -1, -1)
+                    .expand(batch_size, -1, -1)  # Use consistent batch_size
                 )
                 image_end_mask = torch.ones_like(
                     image_end_token[:, :, 0], dtype=torch.bool, device=image_end_token.device
@@ -605,7 +636,19 @@ class VLAFlowMatching(nn.Module):
                 embs.append(image_end_token)
                 pad_masks.append(image_end_mask)
                 att_masks += [0] * (image_end_mask.shape[1])
+        
         lang_emb = self.vlm_with_expert.embed_language_tokens(lang_tokens)
+        # Ensure lang_emb has the correct batch size
+        if lang_emb.shape[0] != batch_size:
+            if lang_emb.shape[0] == 1:
+                # Replicate single language embedding for the entire batch
+                lang_emb = lang_emb.expand(batch_size, -1, -1)
+                lang_masks = lang_masks.expand(batch_size, -1) if lang_masks.shape[0] == 1 else lang_masks[:batch_size]
+            else:
+                # Truncate to match batch size
+                lang_emb = lang_emb[:batch_size]
+                lang_masks = lang_masks[:batch_size]
+        
         # Normalize language embeddings
         lang_emb_dim = lang_emb.shape[-1]
         lang_emb = lang_emb * math.sqrt(lang_emb_dim)
@@ -618,6 +661,13 @@ class VLAFlowMatching(nn.Module):
 
         state_emb = self.state_proj(state)
         state_emb = state_emb[:, None, :] if state_emb.ndim == 2 else state_emb
+        # Ensure state_emb has the correct batch size
+        if state_emb.shape[0] != batch_size:
+            if state_emb.shape[0] == 1:
+                state_emb = state_emb.expand(batch_size, -1, -1)
+            else:
+                state_emb = state_emb[:batch_size]
+        
         embs.append(state_emb)
         bsize = state_emb.shape[0]
         device = state_emb.device
