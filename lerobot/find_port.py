@@ -54,7 +54,14 @@ def find_port():
     if len(ports_diff) == 1:
         port = ports_diff[0]
         print(f"The port of this MotorsBus is '{port}'")
+        try:
+            import pyperclip
+            pyperclip.copy(port)
+            print("Port has been copied to clipboard.")
+        except ImportError:
+            print("Note: Install 'pyperclip' package to enable clipboard functionality")
         print("Reconnect the USB cable.")
+        return port
     elif len(ports_diff) == 0:
         raise OSError(f"Could not detect the port. No difference was found ({ports_diff}).")
     else:
@@ -62,4 +69,5 @@ def find_port():
 
 
 if __name__ == "__main__":
-    find_port()
+    port = find_port()
+    print(port)  # Print just the port value as the final output
